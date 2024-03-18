@@ -1,7 +1,7 @@
 import robocode.*;
 
 // Classe do seu robô
-public class MeuRobo extends AdvancedRobot {
+public class Zanguetsu extends AdvancedRobot {
     private boolean movingForward;
 
     // Método principal do robô
