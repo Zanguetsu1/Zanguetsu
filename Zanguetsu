@@ -3,70 +3,70 @@ import java.awt.Color;
 
 public class Zanguetsu extends AdvancedRobot {
 
-    private boolean peek; // Don't turn if there's a robot there
-    private double moveAmount; // How much to move
+    private int enemiesAlive;
+    private double moveDirection = 1;
 
-    /**
-     * run: Move around the walls
-     */
     public void run() {
-        // Set colors
-        setBodyColor(Color.black);
-        setGunColor(Color.black);
-        setRadarColor(Color.orange);
-        setBulletColor(Color.cyan);
-        setScanColor(Color.cyan);
-
-        // Initialize moveAmount to the maximum possible for this battlefield.
-        moveAmount = Math.max(getBattleFieldWidth(), getBattleFieldHeight());
-        // Initialize peek to false
-        peek = false;
-
-        // turnLeft to face a wall.
-        // getHeading() % 90 means the remainder of
-        // getHeading() divided by 90.
-        turnLeft(getHeading() % 90);
-        ahead(moveAmount);
-        // Turn the gun to turn right 90 degrees.
-        peek = true;
-        turnGunRight(90);
-        turnRight(90);
+        setColors(Color.red, Color.yellow, Color.green); // Definir cores do robô
+        setAdjustRadarForRobotTurn(true);
+        setAdjustGunForRobotTurn(true);
+        setAdjustRadarForGunTurn(true);
+        enemiesAlive = getOthers();
 
         while (true) {
-            // Look before we turn when ahead() completes.
-            peek = true;
-            // Move up the wall
-            ahead(moveAmount);
-            // Don't look now
-            peek = false;
-            // Turn to the next wall
-            turnRight(90);
+            // Movimento circular para evitar tiros inimigos
+            setTurnRightRadians(1 * moveDirection);
+            setAhead(100);
+            moveDirection *= -1;
+
+            // Atualiza o radar
+            turnRadarRightRadians(Double.POSITIVE_INFINITY);
         }
     }
 
-    /**
-     * onHitRobot:  Move away a bit.
-     */
-    public void onHitRobot(HitRobotEvent e) {
-        // If he's in front of us, set back up a bit.
-        if (e.getBearing() > -90 && e.getBearing() < 90) {
-            back(100);
-        } // else he's in back of us, so set ahead a bit.
-        else {
-            ahead(100);
-        }
-    }
-
-    /**
-     * onScannedRobot:  Fire!
-     */
     public void onScannedRobot(ScannedRobotEvent e) {
-        fire(2);
-        // Note that scan is called automatically when the robot is moving.
-        // By calling it manually here, we make sure we generate another scan event if there's a robot on the next
-        // wall, so that we do not start moving up it until it's gone.
-        if (peek) {
-            scan();
-        }
+        double absBearing = getHeadingRadians() + e.getBearingRadians();
+        double angleToEnemy = absBearing - getGunHeadingRadians();
+        double distance = e.getDistance();
+
+        // Ajusta a mira para o inimigo
+        turnGunRightRadians(normalizeBearing(angleToEnemy));
+
+        // Calcula a potência do tiro baseado na distância
+        double power = Math.min(3, Math.max(0.1, 400 / distance));
+
+        // Se o inimigo for o último, atira com potência máxima
+        if (enemiesAlive == 1)
+            power = 3;
+
+        // Atira com a potência calculada
+        setFire(power);
+
+        // Mantém o radar travado no inimigo
+        setTurnRadarRightRadians(normalizeBearing(absBearing - getRadarHeadingRadians()) * 2);
+    }
+
+    public void onHitByBullet(HitByBulletEvent e) {
+        // Gira para evitar ser atingido novamente
+        turnRight(normalizeBearing(e.getBearing()) + 90);
+    }
+
+    public void onHitWall(HitWallEvent e) {
+        // Inverte o movimento ao colidir com a parede
+        moveDirection *= -1;
+    }
+
+    public void onRobotDeath(RobotDeathEvent e) {
+        // Atualiza o número de inimigos vivos
+        enemiesAlive--;
+    }
+
+    // Método para normalizar um ângulo entre -pi e pi
+    private double normalizeBearing(double angle) {
+        while (angle > Math.PI)
+            angle -= 2 * Math.PI;
+        while (angle < -Math.PI)
+            angle += 2 * Math.PI;
+        return angle;
     }
 }
